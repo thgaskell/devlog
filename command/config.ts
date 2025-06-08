@@ -1,12 +1,13 @@
-import { join } from "jsr:@std/path";
-import type { FileOperations } from "./start.ts";
+import { dirname } from "jsr:@std/path";
+import type { FileOperations } from "./types.ts";
 import type { Settings } from "./status.ts";
 import type { ProjectSettings } from "./init.ts";
+import type { PathConfig } from "./paths.ts";
 
 export class ConfigCommand {
   constructor(private fileOps: FileOperations) {}
 
-  async execute(args: string[], currentDir: string, homeDir = Deno.env.get("HOME") || ""): Promise<string> {
+  async execute(args: string[], paths: PathConfig): Promise<string> {
     if (args.length === 0) {
       return "Usage: devlog config <key> [value]";
     }
@@ -14,19 +15,14 @@ export class ConfigCommand {
     const key = args[0];
     const value = args[1];
 
-    const globalSettingsPath = join(homeDir, ".devlog", "settings.json");
-    const projectSettingsPath = join(currentDir, ".devlog", "settings.json");
-
-    // Check if project-specific settings exist first
-    const useProjectSettings = await this.fileOps.exists(projectSettingsPath);
-    const settingsPath = useProjectSettings ? projectSettingsPath : globalSettingsPath;
-
     if (value === undefined) {
-      // Get value
+      // Get value - check project first, fall back to global
+      const useProjectSettings = await this.fileOps.exists(paths.projectSettings);
+      const settingsPath = useProjectSettings ? paths.projectSettings : paths.globalSettings;
       return await this.getValue(settingsPath, key);
     } else {
-      // Set value
-      return await this.setValue(settingsPath, key, value);
+      // Set value - always use project settings
+      return await this.setValue(paths.projectSettings, key, value, true);
     }
   }
 
@@ -50,9 +46,9 @@ export class ConfigCommand {
     }
   }
 
-  private async setValue(settingsPath: string, key: string, value: string): Promise<string> {
+  private async setValue(settingsPath: string, key: string, value: string, isProjectSettings: boolean): Promise<string> {
     // Ensure directory exists
-    const settingsDir = settingsPath.split("/").slice(0, -1).join("/");
+    const settingsDir = dirname(settingsPath);
     await this.fileOps.ensureDir(settingsDir);
 
     let settings: Settings | ProjectSettings = {};
@@ -85,7 +81,7 @@ export class ConfigCommand {
 
     await this.fileOps.writeTextFile(settingsPath, JSON.stringify(settings, null, 2));
 
-    const settingsType = settingsPath.includes("/.devlog/settings.json") ? "project" : "global";
+    const settingsType = isProjectSettings ? "project" : "global";
     return `Set ${settingsType} setting ${key}: ${JSON.stringify(parsedValue)}`;
   }
 }

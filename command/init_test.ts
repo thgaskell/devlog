@@ -1,6 +1,17 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { InitCommand } from "./init.ts";
-import type { FileOperations } from "./start.ts";
+import type { FileOperations } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
+
+function createTestPaths(projectDir: string, homeDir: string): PathConfig {
+  return {
+    globalDir: `${homeDir}/.devlog`,
+    projectDir: `${projectDir}/.devlog`,
+    globalSettings: `${homeDir}/.devlog/settings.json`,
+    projectSettings: `${projectDir}/.devlog/settings.json`,
+    sessions: `${homeDir}/.devlog/sessions.jsonl`
+  };
+}
 
 class MockFileOperations implements FileOperations {
   private files = new Map<string, string>();
@@ -50,8 +61,9 @@ class MockFileOperations implements FileOperations {
 Deno.test("InitCommand - should initialize project with default settings", async () => {
   const mockFileOps = new MockFileOperations();
   const initCommand = new InitCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await initCommand.execute("/path/to/project");
+  const result = await initCommand.execute(paths);
   
   assertEquals(result, "Project initialized with default settings in .devlog/settings.json");
   
@@ -71,11 +83,12 @@ Deno.test("InitCommand - should initialize project with default settings", async
 Deno.test("InitCommand - should handle already initialized project", async () => {
   const mockFileOps = new MockFileOperations();
   const initCommand = new InitCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up existing settings file
   mockFileOps.setFileContent("/path/to/project/.devlog/settings.json", "{}");
   
-  const result = await initCommand.execute("/path/to/project");
+  const result = await initCommand.execute(paths);
   
   assertEquals(result, "Already initialized");
 });
@@ -83,8 +96,9 @@ Deno.test("InitCommand - should handle already initialized project", async () =>
 Deno.test("InitCommand - should create valid JSON settings file", async () => {
   const mockFileOps = new MockFileOperations();
   const initCommand = new InitCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  await initCommand.execute("/path/to/project");
+  await initCommand.execute(paths);
   
   const settingsContent = mockFileOps.getFileContent("/path/to/project/.devlog/settings.json");
   
@@ -101,8 +115,9 @@ Deno.test("InitCommand - should create valid JSON settings file", async () => {
 Deno.test("InitCommand - should create formatted JSON with proper indentation", async () => {
   const mockFileOps = new MockFileOperations();
   const initCommand = new InitCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  await initCommand.execute("/path/to/project");
+  await initCommand.execute(paths);
   
   const settingsContent = mockFileOps.getFileContent("/path/to/project/.devlog/settings.json");
   
@@ -115,9 +130,11 @@ Deno.test("InitCommand - should create formatted JSON with proper indentation", 
 Deno.test("InitCommand - should work with different project paths", async () => {
   const mockFileOps = new MockFileOperations();
   const initCommand = new InitCommand(mockFileOps);
+  const paths1 = createTestPaths("/home/user/project1", "/tmp");
+  const paths2 = createTestPaths("/home/user/project2", "/tmp");
   
-  const result1 = await initCommand.execute("/home/user/project1");
-  const result2 = await initCommand.execute("/home/user/project2");
+  const result1 = await initCommand.execute(paths1);
+  const result2 = await initCommand.execute(paths2);
   
   assertEquals(result1, "Project initialized with default settings in .devlog/settings.json");
   assertEquals(result2, "Project initialized with default settings in .devlog/settings.json");

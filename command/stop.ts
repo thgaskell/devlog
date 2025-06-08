@@ -1,18 +1,16 @@
-import { join } from "jsr:@std/path";
-import type { LogEntry, FileOperations } from "./start.ts";
+import type { FileOperations, LogEntry } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
 
 export class StopCommand {
   constructor(private fileOps: FileOperations) {}
 
-  async execute(message: string, currentDir: string, homeDir = Deno.env.get("HOME") || ""): Promise<string> {
+  async execute(message: string, currentDir: string, paths: PathConfig): Promise<string> {
     if (!message.trim()) {
       return "Error: Message is required for stop command";
     }
-
-    const sessionLogPath = join(homeDir, ".devlog", "sessions.jsonl");
     
     // Check for active session
-    const activeSession = await this.getActiveSession(sessionLogPath, currentDir);
+    const activeSession = await this.getActiveSession(paths.sessions, currentDir);
     if (!activeSession) {
       return "No active session to stop";
     }
@@ -27,8 +25,8 @@ export class StopCommand {
 
     // Append to log file
     const logLine = JSON.stringify(logEntry) + "\n";
-    const existingContent = await this.fileOps.readTextFile(sessionLogPath);
-    await this.fileOps.writeTextFile(sessionLogPath, existingContent + logLine);
+    const existingContent = await this.fileOps.readTextFile(paths.sessions);
+    await this.fileOps.writeTextFile(paths.sessions, existingContent + logLine);
 
     const duration = this.calculateDuration(activeSession.timestamp);
     return `Stopped session: "${message}" (duration: ${duration})`;

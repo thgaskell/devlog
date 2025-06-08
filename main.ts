@@ -5,7 +5,9 @@ import { StopCommand } from "./command/stop.ts";
 import { StatusCommand } from "./command/status.ts";
 import { InitCommand } from "./command/init.ts";
 import { ConfigCommand } from "./command/config.ts";
-import type { FileOperations } from "./command/start.ts";
+import { InfoCommand } from "./command/info.ts";
+import { createPathConfig } from "./command/paths.ts";
+import type { FileOperations } from "./command/types.ts";
 
 class DenoFileOperations implements FileOperations {
   async readTextFile(path: string): Promise<string> {
@@ -49,6 +51,7 @@ Commands:
   init               Initialize project-specific settings
   config <key>       Get configuration value
   config <key> <val> Set configuration value
+  info               Show system information and resolved paths
   help               Show this usage information
 
 Examples:
@@ -58,6 +61,7 @@ Examples:
   devlog init
   devlog config colorOutput
   devlog config orphanedSessionThreshold 180
+  devlog info
 
 Data Storage:
   Global logs:     ~/.devlog/sessions.jsonl
@@ -79,6 +83,16 @@ async function main(): Promise<void> {
   const currentDir = Deno.cwd();
   const fileOps = new DenoFileOperations();
 
+  // Resolve all paths at startup - fail fast if home directory cannot be resolved
+  let paths;
+  try {
+    paths = createPathConfig(currentDir);
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error("DevLog requires access to your home directory to store session logs.");
+    Deno.exit(1);
+  }
+
   try {
     switch (command) {
       case "start": {
@@ -89,7 +103,7 @@ async function main(): Promise<void> {
         }
         const message = args.slice(1).join(" ");
         const startCommand = new StartCommand(fileOps);
-        const result = await startCommand.execute(message, currentDir);
+        const result = await startCommand.execute(message, currentDir, paths);
         console.log(result);
         break;
       }
@@ -102,21 +116,21 @@ async function main(): Promise<void> {
         }
         const message = args.slice(1).join(" ");
         const stopCommand = new StopCommand(fileOps);
-        const result = await stopCommand.execute(message, currentDir);
+        const result = await stopCommand.execute(message, currentDir, paths);
         console.log(result);
         break;
       }
 
       case "status": {
         const statusCommand = new StatusCommand(fileOps);
-        const result = await statusCommand.execute(currentDir);
+        const result = await statusCommand.execute(currentDir, paths);
         console.log(result);
         break;
       }
 
       case "init": {
         const initCommand = new InitCommand(fileOps);
-        const result = await initCommand.execute(currentDir);
+        const result = await initCommand.execute(paths);
         console.log(result);
         break;
       }
@@ -129,7 +143,14 @@ async function main(): Promise<void> {
         }
         const configArgs = args.slice(1);
         const configCommand = new ConfigCommand(fileOps);
-        const result = await configCommand.execute(configArgs, currentDir);
+        const result = await configCommand.execute(configArgs, paths);
+        console.log(result);
+        break;
+      }
+
+      case "info": {
+        const infoCommand = new InfoCommand(fileOps);
+        const result = await infoCommand.execute(currentDir, paths);
         console.log(result);
         break;
       }

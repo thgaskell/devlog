@@ -1,5 +1,5 @@
-import { join } from "jsr:@std/path";
-import type { FileOperations } from "./start.ts";
+import type { FileOperations } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
 
 export interface ProjectSettings {
   projectName?: string | null;
@@ -11,17 +11,14 @@ export interface ProjectSettings {
 export class InitCommand {
   constructor(private fileOps: FileOperations) {}
 
-  async execute(currentDir: string): Promise<string> {
-    const devlogDir = join(currentDir, ".devlog");
-    const settingsPath = join(devlogDir, "settings.json");
-    
+  async execute(paths: PathConfig): Promise<string> {
     // Check if already initialized
-    if (await this.fileOps.exists(settingsPath)) {
+    if (await this.fileOps.exists(paths.projectSettings)) {
       return "Already initialized";
     }
 
     // Create .devlog directory
-    await this.fileOps.ensureDir(devlogDir);
+    await this.fileOps.ensureDir(paths.projectDir);
 
     // Create default project settings
     const defaultSettings: ProjectSettings = {
@@ -31,7 +28,7 @@ export class InitCommand {
       excludePatterns: ["node_modules", ".git"]
     };
 
-    await this.fileOps.writeTextFile(settingsPath, JSON.stringify(defaultSettings, null, 2));
+    await this.fileOps.writeTextFile(paths.projectSettings, JSON.stringify(defaultSettings, null, 2));
 
     return "Project initialized with default settings in .devlog/settings.json";
   }

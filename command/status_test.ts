@@ -1,6 +1,17 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { StatusCommand } from "./status.ts";
-import type { FileOperations } from "./start.ts";
+import type { FileOperations } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
+
+function createTestPaths(projectDir: string, homeDir: string): PathConfig {
+  return {
+    globalDir: `${homeDir}/.devlog`,
+    projectDir: `${projectDir}/.devlog`,
+    globalSettings: `${homeDir}/.devlog/settings.json`,
+    projectSettings: `${projectDir}/.devlog/settings.json`,
+    sessions: `${homeDir}/.devlog/sessions.jsonl`
+  };
+}
 
 class MockFileOperations implements FileOperations {
   private files = new Map<string, string>();
@@ -46,8 +57,9 @@ class MockFileOperations implements FileOperations {
 Deno.test("StatusCommand - should show no active session when none exists", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertEquals(result, "No active session");
 });
@@ -55,6 +67,7 @@ Deno.test("StatusCommand - should show no active session when none exists", asyn
 Deno.test("StatusCommand - should show active session details", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up active session
   const existingLog = JSON.stringify({
@@ -66,7 +79,7 @@ Deno.test("StatusCommand - should show active session details", async () => {
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertStringIncludes(result, 'Active session: "Working on authentication"');
   assertStringIncludes(result, "Duration: 30m");
@@ -76,6 +89,7 @@ Deno.test("StatusCommand - should show active session details", async () => {
 Deno.test("StatusCommand - should warn about orphaned sessions with default threshold", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up session started 5 hours ago (exceeds default 4h threshold)
   const existingLog = JSON.stringify({
@@ -87,7 +101,7 @@ Deno.test("StatusCommand - should warn about orphaned sessions with default thre
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertStringIncludes(result, "⚠️  Warning: Session has been active for 5h 0m");
   assertStringIncludes(result, ">4h threshold");
@@ -96,6 +110,7 @@ Deno.test("StatusCommand - should warn about orphaned sessions with default thre
 Deno.test("StatusCommand - should use custom orphaned threshold from settings", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up custom settings with 2 hour threshold
   const settings = JSON.stringify({
@@ -114,7 +129,7 @@ Deno.test("StatusCommand - should use custom orphaned threshold from settings", 
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertStringIncludes(result, "⚠️  Warning: Session has been active for 3h 0m");
   assertStringIncludes(result, ">2h threshold");
@@ -123,6 +138,7 @@ Deno.test("StatusCommand - should use custom orphaned threshold from settings", 
 Deno.test("StatusCommand - should not warn when session is under threshold", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up session started 1 hour ago (under default 4h threshold)
   const existingLog = JSON.stringify({
@@ -134,7 +150,7 @@ Deno.test("StatusCommand - should not warn when session is under threshold", asy
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertStringIncludes(result, "Duration: 1h 0m");
   assertEquals(result.includes("Warning"), false);
@@ -143,6 +159,7 @@ Deno.test("StatusCommand - should not warn when session is under threshold", asy
 Deno.test("StatusCommand - should handle closed sessions correctly", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up start and stop for same project (session closed)
   const existingLog = 
@@ -161,7 +178,7 @@ Deno.test("StatusCommand - should handle closed sessions correctly", async () =>
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertEquals(result, "No active session");
 });
@@ -169,6 +186,7 @@ Deno.test("StatusCommand - should handle closed sessions correctly", async () =>
 Deno.test("StatusCommand - should handle invalid JSON in log file", async () => {
   const mockFileOps = new MockFileOperations();
   const statusCommand = new StatusCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up log with invalid JSON line mixed with valid line
   const existingLog = 
@@ -182,7 +200,7 @@ Deno.test("StatusCommand - should handle invalid JSON in log file", async () => 
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await statusCommand.execute("/path/to/project", "/tmp");
+  const result = await statusCommand.execute("/path/to/project", paths);
   
   assertStringIncludes(result, 'Active session: "Valid entry"');
   assertStringIncludes(result, "Duration: 30m");

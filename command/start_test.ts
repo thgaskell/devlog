@@ -1,6 +1,17 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { StartCommand } from "./start.ts";
-import type { FileOperations } from "./start.ts";
+import type { FileOperations } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
+
+function createTestPaths(projectDir: string, homeDir: string): PathConfig {
+  return {
+    globalDir: `${homeDir}/.devlog`,
+    projectDir: `${projectDir}/.devlog`,
+    globalSettings: `${homeDir}/.devlog/settings.json`,
+    projectSettings: `${projectDir}/.devlog/settings.json`,
+    sessions: `${homeDir}/.devlog/sessions.jsonl`
+  };
+}
 
 class MockFileOperations implements FileOperations {
   private files = new Map<string, string>();
@@ -46,8 +57,9 @@ class MockFileOperations implements FileOperations {
 Deno.test("StartCommand - should create new session when no active session exists", async () => {
   const mockFileOps = new MockFileOperations();
   const startCommand = new StartCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await startCommand.execute("Working on user auth", "/path/to/project", "/tmp");
+  const result = await startCommand.execute("Working on user auth", "/path/to/project", paths);
   
   assertEquals(result, 'Started session: "Working on user auth"');
   
@@ -60,6 +72,7 @@ Deno.test("StartCommand - should create new session when no active session exist
 Deno.test("StartCommand - should warn when active session exists", async () => {
   const mockFileOps = new MockFileOperations();
   const startCommand = new StartCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up existing active session
   const existingLog = JSON.stringify({
@@ -71,7 +84,7 @@ Deno.test("StartCommand - should warn when active session exists", async () => {
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await startCommand.execute("New task", "/path/to/project", "/tmp");
+  const result = await startCommand.execute("New task", "/path/to/project", paths);
   
   assertStringIncludes(result, "Warning: Active session already exists");
   assertStringIncludes(result, "Previous task");
@@ -81,6 +94,7 @@ Deno.test("StartCommand - should warn when active session exists", async () => {
 Deno.test("StartCommand - should allow start for different projects", async () => {
   const mockFileOps = new MockFileOperations();
   const startCommand = new StartCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up existing active session for different project
   const existingLog = JSON.stringify({
@@ -92,7 +106,7 @@ Deno.test("StartCommand - should allow start for different projects", async () =
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await startCommand.execute("New project task", "/path/to/project", "/tmp");
+  const result = await startCommand.execute("New project task", "/path/to/project", paths);
   
   assertEquals(result, 'Started session: "New project task"');
 });
@@ -100,8 +114,9 @@ Deno.test("StartCommand - should allow start for different projects", async () =
 Deno.test("StartCommand - should require message", async () => {
   const mockFileOps = new MockFileOperations();
   const startCommand = new StartCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await startCommand.execute("", "/path/to/project", "/tmp");
+  const result = await startCommand.execute("", "/path/to/project", paths);
   
   assertEquals(result, "Error: Message is required for start command");
 });
@@ -109,6 +124,7 @@ Deno.test("StartCommand - should require message", async () => {
 Deno.test("StartCommand - should handle closed sessions correctly", async () => {
   const mockFileOps = new MockFileOperations();
   const startCommand = new StartCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up start and stop for same project
   const existingLog = 
@@ -127,7 +143,7 @@ Deno.test("StartCommand - should handle closed sessions correctly", async () => 
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await startCommand.execute("New task", "/path/to/project", "/tmp");
+  const result = await startCommand.execute("New task", "/path/to/project", paths);
   
   assertEquals(result, 'Started session: "New task"');
 });

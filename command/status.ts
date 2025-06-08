@@ -1,5 +1,5 @@
-import { join } from "jsr:@std/path";
-import type { LogEntry, FileOperations } from "./start.ts";
+import type { FileOperations, LogEntry } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
 
 export interface Settings {
   orphanedSessionThreshold?: number;
@@ -11,16 +11,13 @@ export interface Settings {
 export class StatusCommand {
   constructor(private fileOps: FileOperations) {}
 
-  async execute(currentDir: string, homeDir = Deno.env.get("HOME") || ""): Promise<string> {
-    const sessionLogPath = join(homeDir, ".devlog", "sessions.jsonl");
-    const settingsPath = join(homeDir, ".devlog", "settings.json");
-    
+  async execute(currentDir: string, paths: PathConfig): Promise<string> {
     // Load settings
-    const settings = await this.loadSettings(settingsPath);
+    const settings = await this.loadSettings(paths.globalSettings);
     const orphanedThreshold = settings.orphanedSessionThreshold || 240; // 4 hours default
     
     // Check for active session
-    const activeSession = await this.getActiveSession(sessionLogPath, currentDir);
+    const activeSession = await this.getActiveSession(paths.sessions, currentDir);
     if (!activeSession) {
       return "No active session";
     }

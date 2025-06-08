@@ -1,6 +1,17 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { StopCommand } from "./stop.ts";
-import type { FileOperations } from "./start.ts";
+import type { FileOperations } from "./types.ts";
+import type { PathConfig } from "./paths.ts";
+
+function createTestPaths(projectDir: string, homeDir: string): PathConfig {
+  return {
+    globalDir: `${homeDir}/.devlog`,
+    projectDir: `${projectDir}/.devlog`,
+    globalSettings: `${homeDir}/.devlog/settings.json`,
+    projectSettings: `${projectDir}/.devlog/settings.json`,
+    sessions: `${homeDir}/.devlog/sessions.jsonl`
+  };
+}
 
 class MockFileOperations implements FileOperations {
   private files = new Map<string, string>();
@@ -46,6 +57,7 @@ class MockFileOperations implements FileOperations {
 Deno.test("StopCommand - should stop active session and log outcome", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up existing active session
   const existingLog = JSON.stringify({
@@ -57,7 +69,7 @@ Deno.test("StopCommand - should stop active session and log outcome", async () =
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await stopCommand.execute("Auth flow completed", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("Auth flow completed", "/path/to/project", paths);
   
   assertStringIncludes(result, 'Stopped session: "Auth flow completed"');
   assertStringIncludes(result, "duration: 45m");
@@ -70,8 +82,9 @@ Deno.test("StopCommand - should stop active session and log outcome", async () =
 Deno.test("StopCommand - should handle no active session", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await stopCommand.execute("Trying to stop", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("Trying to stop", "/path/to/project", paths);
   
   assertEquals(result, "No active session to stop");
 });
@@ -79,6 +92,7 @@ Deno.test("StopCommand - should handle no active session", async () => {
 Deno.test("StopCommand - should handle already stopped session", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up start and stop for same project (session already closed)
   const existingLog = 
@@ -97,7 +111,7 @@ Deno.test("StopCommand - should handle already stopped session", async () => {
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await stopCommand.execute("Trying to stop again", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("Trying to stop again", "/path/to/project", paths);
   
   assertEquals(result, "No active session to stop");
 });
@@ -105,8 +119,9 @@ Deno.test("StopCommand - should handle already stopped session", async () => {
 Deno.test("StopCommand - should require message", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
-  const result = await stopCommand.execute("", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("", "/path/to/project", paths);
   
   assertEquals(result, "Error: Message is required for stop command");
 });
@@ -114,6 +129,7 @@ Deno.test("StopCommand - should require message", async () => {
 Deno.test("StopCommand - should handle different project with active session", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up active session for different project
   const existingLog = JSON.stringify({
@@ -125,7 +141,7 @@ Deno.test("StopCommand - should handle different project with active session", a
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await stopCommand.execute("No session for this project", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("No session for this project", "/path/to/project", paths);
   
   assertEquals(result, "No active session to stop");
 });
@@ -133,6 +149,7 @@ Deno.test("StopCommand - should handle different project with active session", a
 Deno.test("StopCommand - should calculate duration in hours and minutes", async () => {
   const mockFileOps = new MockFileOperations();
   const stopCommand = new StopCommand(mockFileOps);
+  const paths = createTestPaths("/path/to/project", "/tmp");
   
   // Set up session started 2.5 hours ago
   const existingLog = JSON.stringify({
@@ -144,7 +161,7 @@ Deno.test("StopCommand - should calculate duration in hours and minutes", async 
   
   mockFileOps.setFileContent("/tmp/.devlog/sessions.jsonl", existingLog);
   
-  const result = await stopCommand.execute("Finally done", "/path/to/project", "/tmp");
+  const result = await stopCommand.execute("Finally done", "/path/to/project", paths);
   
   assertStringIncludes(result, "duration: 2h 30m");
 });

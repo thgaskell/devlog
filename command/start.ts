@@ -1,31 +1,16 @@
-import { join } from "jsr:@std/path";
-
-export interface LogEntry {
-  timestamp: string;
-  type: "start" | "stop";
-  message: string;
-  project: string;
-}
-
-export interface FileOperations {
-  readTextFile(path: string): Promise<string>;
-  writeTextFile(path: string, content: string): Promise<void>;
-  exists(path: string): Promise<boolean>;
-  ensureDir(path: string): Promise<void>;
-}
+import type { PathConfig } from "./paths.ts";
+import type { FileOperations, LogEntry } from "./types.ts";
 
 export class StartCommand {
   constructor(private fileOps: FileOperations) {}
 
-  async execute(message: string, currentDir: string, homeDir = Deno.env.get("HOME") || ""): Promise<string> {
+  async execute(message: string, currentDir: string, paths: PathConfig): Promise<string> {
     if (!message.trim()) {
       return "Error: Message is required for start command";
     }
 
-    const sessionLogPath = join(homeDir, ".devlog", "sessions.jsonl");
-    
     // Check for active session
-    const activeSession = await this.getActiveSession(sessionLogPath, currentDir);
+    const activeSession = await this.getActiveSession(paths.sessions, currentDir);
     if (activeSession) {
       const duration = this.calculateDuration(activeSession.timestamp);
       return `Warning: Active session already exists for this project.\nCurrent session: "${activeSession.message}" (started ${duration} ago)`;
@@ -40,15 +25,15 @@ export class StartCommand {
     };
 
     // Ensure directory exists
-    await this.fileOps.ensureDir(join(homeDir, ".devlog"));
+    await this.fileOps.ensureDir(paths.globalDir);
 
     // Append to log file
     const logLine = JSON.stringify(logEntry) + "\n";
     let existingContent = "";
-    if (await this.fileOps.exists(sessionLogPath)) {
-      existingContent = await this.fileOps.readTextFile(sessionLogPath);
+    if (await this.fileOps.exists(paths.sessions)) {
+      existingContent = await this.fileOps.readTextFile(paths.sessions);
     }
-    await this.fileOps.writeTextFile(sessionLogPath, existingContent + logLine);
+    await this.fileOps.writeTextFile(paths.sessions, existingContent + logLine);
 
     return `Started session: "${message}"`;
   }
